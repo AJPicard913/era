@@ -11,6 +11,7 @@ import CoreData
 struct ContentView: View {
     @State private var showBreathingView = false
     @Environment(\.managedObjectContext) private var viewContext
+    @State private var showAnalytics = false
 
     // Sort with string key to avoid key-path issues
     @FetchRequest(
@@ -33,8 +34,16 @@ struct ContentView: View {
                         Text(now, format: .dateTime.month().day().year()) // Shows "August 19, 2025"
                             .font(.system(size: 32, weight: .bold))
                         Spacer()
-                        Image(systemName: "chart.bar.fill")
-                            .font(.title2)
+                        Button {
+                            showAnalytics = true
+                        } label: {
+                            Image(systemName: "chart.bar.fill")
+                                .font(.title2)
+                                .contentShape(Rectangle())
+                                .frame(width: 44, height: 44, alignment: .center)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Show Analytics")
                     }
                     .padding(.horizontal)
 
@@ -155,6 +164,10 @@ struct ContentView: View {
                             sessionJustCompleted = true
                         }
                 }
+                .sheet(isPresented: $showAnalytics) {
+                    AnalyticsView(context: viewContext)
+                }
+
             }
         }
         // tick 'now' every minute so the text stays current

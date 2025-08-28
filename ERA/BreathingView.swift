@@ -178,22 +178,31 @@ struct BreathingView: View {
     // MARK: - Sequence (unchanged logic)
     private func runSequence() async {
         sessionStartDate = Date()
+        
+        // Repeat the breathing cycle 3 times
+        for cycle in 1...3 {
+            phase = .inhale
+            await animateInhaleBeats(totalDuration: inhaleDuration)
 
-        phase = .inhale
-        await animateInhaleBeats(totalDuration: inhaleDuration)
+            phase = .hold
+            await bounceButtonWithHaptic()
+            try? await Task.sleep(nanoseconds: UInt64(phaseGap * 1_000_000_000))
+            await runHoldSine(for: holdDuration)
 
-        phase = .hold
-        await bounceButtonWithHaptic()
-        try? await Task.sleep(nanoseconds: UInt64(phaseGap * 1_000_000_000))
-        await runHoldSine(for: holdDuration)
-
-        phase = .exhale
-        await bounceButtonWithHaptic()
-        try? await Task.sleep(nanoseconds: UInt64(phaseGap * 1_000_000_000))
-        await animateExhaleBeats(totalDuration: exhaleDuration)
-
-        await MainActor.run { buttonAtTop = false }
-        await presentFinishedOverlay()
+            phase = .exhale
+            await bounceButtonWithHaptic()
+            try? await Task.sleep(nanoseconds: UInt64(phaseGap * 1_000_000_000))
+            await animateExhaleBeats(totalDuration: exhaleDuration)
+            
+            // Only hide the button and show finish screen after the third cycle
+            if cycle == 3 {
+                await MainActor.run { buttonAtTop = false }
+                await presentFinishedOverlay()
+            } else {
+                // Small pause between cycles
+                try? await Task.sleep(nanoseconds: UInt64(phaseGap * 1_000_000_000))
+            }
+        }
     }
 
     // MARK: - Save session (unchanged)
