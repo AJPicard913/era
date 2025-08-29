@@ -35,6 +35,8 @@
 			membershipExceptions = (
 				Assets.xcassets,
 				EraModel.xcdatamodeld,
+				OnboardingOneView.swift,
+				OnboardingTwoView.swift,
 			);
 			target = 405802DD2E4C31D7001D642B /* ERATests */;
 		};
@@ -43,6 +45,8 @@
 			membershipExceptions = (
 				Assets.xcassets,
 				EraModel.xcdatamodeld,
+				OnboardingOneView.swift,
+				OnboardingTwoView.swift,
 			);
 			target = 405802E72E4C31D7001D642B /* ERAUITests */;
 		};
