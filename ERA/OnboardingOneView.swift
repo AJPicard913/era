@@ -13,15 +13,15 @@ struct OnboardingOneView: View {
     // Animation driver (0 → STOP_PROGRESS)
     @State private var progress: Double = 0.0
 
-    // Pill entrance
-    @State private var showPill = false
-    @State private var pillScale: CGFloat = 0.94
-
     // Button slide-in (mirrors your breathing button behavior)
     @State private var buttonAtBottom = false
 
     // Haptics
     @State private var hapticEngine: CHHapticEngine?
+
+    // Typing animation state
+    @State private var typedText: String = ""
+    private let fullText = "Welcome to Era"
 
     // Timings (mirrors your inhale timing/feel)
     private let inhaleDuration: Double = 4.0
@@ -45,37 +45,29 @@ struct OnboardingOneView: View {
                             opacity: 0.70)
             }
 
-            // “Welcome to Era” pill – slides up & bounces after the circles stop
-            if showPill {
-                Text("Welcome to Era")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 20)
-                    .frame(height: 40)
-                    .background(
-                        VisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterial))
-                            .opacity(0.8)
-                    )
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule().stroke(Color.black.opacity(0.18), lineWidth: 0.5)
-                    )
-                    .scaleEffect(pillScale)
-                    .shadow(color: Color.black.opacity(0.10), radius: 12, x: 0, y: 8)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-                    .padding(.bottom, 32)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .onAppear {
-                        // subtle bounce
-                        withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
-                            pillScale = 1.0
-                        }
-                        // handoff 2s after the pill is visible (ties timing to the actual appearance)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                            animateOutAndFinish()
-                        }
+            VStack {
+                HStack {
+                    if typedText.count < fullText.count {
+                        Text(typedText)
+                            .font(.system(size: 28, weight: .semibold))
+                            .foregroundColor(.black)
+                    } else {
+                        Text("Welcome to ")
+                            .font(.system(size: 28, weight: .semibold))
+                            .foregroundColor(.black)
+                        + Text("Era.")
+                            .font(.system(size: 28, weight: .semibold))
+                            .foregroundStyle(
+                                LinearGradient(colors: [Color(hex: "CBAACB"), Color(hex: "FFB5A7")],
+                                               startPoint: .leading, endPoint: .trailing)
+                            )
                     }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 25)
+                Spacer()
             }
+            .padding(.top, 50)
         }
         .toolbar(.hidden, for: .navigationBar) // no back button
         .onAppear {
@@ -112,26 +104,22 @@ struct OnboardingOneView: View {
             }
         }
 
-        // When the last beat lands (≈ inhaleDuration), show the pill.
-        // The handoff is now scheduled from the pill's `.onAppear` so it's
-        // tied to when the pill actually appears on screen.
+        // When the last beat lands (≈ inhaleDuration), start typing text
         DispatchQueue.main.asyncAfter(deadline: .now() + inhaleDuration + 0.05) {
             playHapticTransient(intensity: 0.9, sharpness: 0.7)
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
-                showPill = true
+            Task {
+                await typeText()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    animateOutAndFinish()
+                }
             }
         }
     }
 
-    /// Animate pill + circles off-screen, then hand off to OB2
+    /// Animate circles off-screen, then hand off to OB2
     private func animateOutAndFinish() {
         // Haptic cue as we leave
         playHapticTransient(intensity: 0.6, sharpness: 0.5)
-
-        // Pill slides/fades down using its .transition on removal
-        withAnimation(.easeInOut(duration: 0.45)) {
-            showPill = false
-        }
 
         // Circles glide back down (progress → 0)
         withAnimation(.easeInOut(duration: 0.55)) {
@@ -141,6 +129,17 @@ struct OnboardingOneView: View {
         // After the out-animations complete, advance
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
             onFinished()
+        }
+    }
+
+    // MARK: - Typing animation
+    private func typeText() async {
+        typedText = ""
+        for char in fullText {
+            await MainActor.run {
+                typedText.append(char)
+            }
+            try? await Task.sleep(nanoseconds: 80_000_000) // 0.08 seconds
         }
     }
 

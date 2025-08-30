@@ -17,8 +17,6 @@ struct OnboardingTwoView: View {
 
     @State private var ringScales: [CGFloat] = [0.01, 0.01, 0.01, 0.01]
     @State private var groupScale: CGFloat = 1.0
-    @State private var ringStrokeScale: [CGFloat] = [0.6, 0.6, 0.6, 0.6]
-    @State private var ringStrokeOpacity: [Double] = [0.0, 0.0, 0.0, 0.0]
     @State private var showSentence: Bool = false
     @State private var slideDown: Bool = false
 
@@ -43,18 +41,6 @@ struct OnboardingTwoView: View {
                         )
                         .frame(width: sizes[i], height: sizes[i])
                         .scaleEffect(ringScales[i])
-                        .overlay(
-                            Circle()
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [Color(hex:"CBAACB"), Color(hex:"FFB5A7")],
-                                        startPoint: .leading, endPoint: .trailing
-                                    ), lineWidth: 2
-                                )
-                                .scaleEffect(ringStrokeScale[i])
-                                .opacity(ringStrokeOpacity[i])
-                                .allowsHitTesting(false)
-                        )
                         .zIndex(Double(-i))
                 }
             }
@@ -93,55 +79,19 @@ struct OnboardingTwoView: View {
 
     // MARK: - Sequence
     private func runSequence() async {
-        // 1) Rings scale-in over ~2s total (center → outer), with a tiny overshoot
-        let step = 2.0 / Double(ringScales.count) // ~0.5s per ring
-        for i in 0..<ringScales.count {
-            // 1) Circle overshoots with a bouncy spring
-            await MainActor.run {
-                withAnimation(.interpolatingSpring(stiffness: 220, damping: 16)) {
-                    ringScales[i] = 1.10
-                }
-            }
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-
-            // 2) Stroke line grows outward
-            await MainActor.run {
-                ringStrokeOpacity[i] = 0.85
-                withAnimation(.easeOut(duration: step * 0.35)) {
-                    ringStrokeScale[i] = 1.18
-                }
-            }
-            try? await Task.sleep(nanoseconds: UInt64(step * 0.35 * 1_000_000_000))
-
-            // 3) Circle settles; stroke retracts to final size and fades
-            await MainActor.run {
-                withAnimation(.interpolatingSpring(stiffness: 160, damping: 20)) {
-                    ringScales[i] = 1.0
-                    ringStrokeScale[i] = 1.0
-                }
-            }
-            await MainActor.run {
-                withAnimation(.easeOut(duration: step * 0.20)) { ringStrokeOpacity[i] = 0.0 }
-            }
-
-            // short remainder to keep total per-ring ≈ step
-            try? await Task.sleep(nanoseconds: UInt64(step * 0.45 * 1_000_000_000))
-        }
-
-        // 2) Smooth pulse for all rings (~1.5s total)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        await MainActor.run {
-            withAnimation(.easeInOut(duration: 0.75)) { groupScale = 0.92 }
-        }
-        try? await Task.sleep(nanoseconds: 750_000_000)
-        UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-        await MainActor.run {
-            withAnimation(.interpolatingSpring(stiffness: 140, damping: 12)) { groupScale = 1.0 }
-        }
-        try? await Task.sleep(nanoseconds: 750_000_000)
-
-        // 3) Typewriter text
+        await animateRings()
+        try? await Task.sleep(nanoseconds: 1_500_000_000)
         await typeText()
+    }
+
+    private func animateRings() async {
+        for i in 0..<ringScales.count {
+            Task {
+                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true).delay(Double(i) * 0.3)) {
+                    ringScales[i] = 1.1
+                }
+            }
+        }
     }
 
     private func typeText() async {
