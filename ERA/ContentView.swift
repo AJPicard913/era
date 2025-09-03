@@ -58,7 +58,7 @@ struct ContentView: View {
 
                     // Body Content
                     VStack {
-                        if let last = lastSessionDate, !sessionJustCompleted {
+                        if let last = lastSessionDate {
                             let t = timeSince(last, to: Date())
 
                             HStack(spacing: 8) {
@@ -96,19 +96,6 @@ struct ContentView: View {
                                 .multilineTextAlignment(.center)
                                 .lineSpacing(4)
                                 .padding(.top, 0.5)
-                        } else if sessionJustCompleted {
-                            VStack(spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 32))
-                                    .foregroundColor(.green)
-                                Text("Great job!")
-                                    .font(.system(size: 24, weight: .bold))
-                                Text("You've completed your breathing session.")
-                                    .font(.system(size: 18))
-                                    .foregroundColor(.gray)
-                                    .multilineTextAlignment(.center)
-                            }
-                            .padding(.vertical, 20)
                         } else {
                             // First run: show the animated rings above the label
                             VStack(spacing: 16) {
@@ -130,7 +117,6 @@ struct ContentView: View {
                                             .zIndex(Double(-i))
                                     }
                                 }
-                             
                                 .onAppear {
                                     if !ringsAnimated {
                                         ringsAnimated = true
@@ -138,7 +124,6 @@ struct ContentView: View {
                                     }
                                 }
 
-                               
                                 Text("Let's take your first breathing session.")
                                     .foregroundColor(.gray)
                                     .font(.system(size: 18))
@@ -213,10 +198,9 @@ struct ContentView: View {
                     BreathingView()
                         .environment(\.managedObjectContext, viewContext)
                         .ignoresSafeArea()
-                        .onDisappear { sessionJustCompleted = true }
                 }
                 .sheet(isPresented: $showAnalytics) {
-                    AnalyticsSheet(context: viewContext)
+                    AnalyticsView(context: viewContext)
                 }
             }
         }
@@ -249,25 +233,6 @@ struct ContentView: View {
                 }
             }
         }
-    }
-}
-
-// Minimal placeholder so the sheet compiles even if you don't have a separate AnalyticsView yet.
-private struct AnalyticsSheet: View {
-    let context: NSManagedObjectContext
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "chart.bar.xaxis")
-                .font(.system(size: 36))
-                .foregroundStyle(
-                    LinearGradient(colors: [Color(hex: "CBAACB"), Color(hex: "FFB5A7")], startPoint: .leading, endPoint: .trailing)
-                )
-            Text("Analytics coming soon")
-                .font(.headline)
-            Text("We’ll summarize your sessions here.")
-                .foregroundColor(.secondary)
-        }
-        .padding()
     }
 }
 

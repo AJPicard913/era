@@ -19,6 +19,7 @@ struct OnboardingTwoView: View {
     @State private var groupScale: CGFloat = 1.0
     @State private var showSentence: Bool = false
     @State private var slideDown: Bool = false
+    @State private var goToOnboardingThree: Bool = false
 
     // Typewriter
     private let staticPrefix = "Era’s "
@@ -75,6 +76,11 @@ struct OnboardingTwoView: View {
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .onAppear { Task { await runSequence() } }
+        .fullScreenCover(isPresented: $goToOnboardingThree) {
+            OnboardingThreeView()
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                .ignoresSafeArea()
+        }
     }
 
     // MARK: - Sequence
@@ -103,12 +109,15 @@ struct OnboardingTwoView: View {
             await MainActor.run { typed.append(ch) }
             try? await Task.sleep(nanoseconds: 28_000_000)  // ~0.028s per character
         }
-        // Wait 3 seconds, then slide the whole view down, then navigate to ContentView
+        // Wait 3 seconds, then slide the whole view down, then navigate to OnboardingThreeView
         try? await Task.sleep(nanoseconds: 3_000_000_000)
         await MainActor.run {
             withAnimation(.easeInOut(duration: 0.55)) { slideDown = true }
         }
         try? await Task.sleep(nanoseconds: 550_000_000)
-        await MainActor.run { onFinished?() }
+        await MainActor.run {
+            // Navigate to OnboardingThreeView after the slide-down finishes
+            goToOnboardingThree = true
+        }
     }
 }
