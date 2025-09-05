@@ -11,10 +11,11 @@ import CoreData
 struct RootView: View {
     enum Step { case one, two, four, home }
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
-    @AppStorage("hasAcceptedNotifications") private var hasAcceptedNotifications: Bool = false
-    @AppStorage("hasConfiguredNotificationTimes") private var hasConfiguredNotificationTimes: Bool = false
-    @AppStorage("forceOnboardingDebug") private var forceOnboardingDebug: Bool = false
     @State private var step: Step = .one
+    init() {
+        let completed = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+        _step = State(initialValue: completed ? .home : .one)
+    }
 
     var body: some View {
         Group {
@@ -40,20 +41,13 @@ struct RootView: View {
 
             case .home:
                 ContentView()
+                    .onAppear {
+                        hasCompletedOnboarding = true
+                    }
             }
         }
-        .onAppear {
-            // If debugging is enabled, do not auto-route (so you can manually navigate)
-            if forceOnboardingDebug { return }
-            // If user accepted notifications earlier but didn't set times, send them to Onboarding 4
-            if hasAcceptedNotifications && !hasConfiguredNotificationTimes {
-                step = .four
-                return
-            }
-            // If they fully completed onboarding previously, go straight home
-            if hasCompletedOnboarding {
-                step = .home
-            }
+        .onChange(of: hasCompletedOnboarding) { newValue in
+            if newValue { step = .home }
         }
     }
 }

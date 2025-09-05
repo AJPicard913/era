@@ -90,23 +90,15 @@ final class AnalyticsViewModel: ObservableObject {
 
     // MARK: - Helpers (Core Data aggregation)
     private func computeTotalMinutesAllTime() -> Int {
-        // Prefer a 'duration' field if present; otherwise compute from startedAt/endedAt
-        let request = NSFetchRequest<NSManagedObject>(entityName: "BreathingSession")
+        // Compute from startedAt/endedAt only to avoid KVC issues on non-existent keys
+        let request: NSFetchRequest<BreathingSession> = BreathingSession.fetchRequest()
         request.returnsObjectsAsFaults = false
         do {
             let sessions = try context.fetch(request)
             var totalSeconds: Double = 0
             for s in sessions {
-                if let dur = s.value(forKey: "duration") as? Double {
-                    totalSeconds += max(0, dur)
-                } else if let durInt = s.value(forKey: "duration") as? Int {
-                    totalSeconds += max(0, Double(durInt))
-                } else {
-                    let start = s.value(forKey: "startedAt") as? Date
-                    let end = s.value(forKey: "endedAt") as? Date
-                    if let st = start, let en = end {
-                        totalSeconds += max(0, en.timeIntervalSince(st))
-                    }
+                if let st = s.startedAt, let en = s.endedAt {
+                    totalSeconds += max(0, en.timeIntervalSince(st))
                 }
             }
             return Int((totalSeconds / 60.0).rounded())
