@@ -12,6 +12,7 @@ struct OnboardingFourView: View {
     // Persist onboarding state
     @AppStorage("hasAcceptedNotifications") private var hasAcceptedNotifications: Bool = true
     @AppStorage("hasConfiguredNotificationTimes") private var hasConfiguredNotificationTimes: Bool = false
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
 
     // Time slots (hour & minute); start with one slot
     @State private var timeSlots: [Date] = [Date()]
@@ -162,6 +163,7 @@ struct OnboardingFourView: View {
                             Task {
                                 await scheduleDailyNotifications()
                                 hasConfiguredNotificationTimes = true
+                                hasCompletedOnboarding = true
                                 navigateHome = true
                             }
                         } label: {
@@ -193,6 +195,7 @@ struct OnboardingFourView: View {
                 VStack {
                     Spacer()
                     Button {
+                        hasCompletedOnboarding = true
                         navigateHome = true
                     } label: {
                         Text("Skip")

@@ -9,45 +9,37 @@ import SwiftUI
 import CoreData
 
 struct RootView: View {
-    enum Step { case one, two, four, home }
+    enum Step { case one, two, four }
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
-    @State private var step: Step = .one
-    init() {
-        let completed = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
-        _step = State(initialValue: completed ? .home : .one)
-    }
+    @State private var onboardingStep: Step = .one
+
+    @EnvironmentObject var pm: PurchaseManager
+    @EnvironmentObject var access: AccessGate
 
     var body: some View {
         Group {
-            switch step {
-            case .one:
-                OnboardingOneView {
-                    // After onboarding 1 finishes, go to onboarding 2
-                    step = .two
-                }
-                .toolbar(.hidden, for: .navigationBar)
-
-            case .two:
-                OnboardingTwoView {
-                    // After onboarding 2 finishes, show the main app
-                    hasCompletedOnboarding = true
-                    step = .home
-                }
-                .toolbar(.hidden, for: .navigationBar)
-
-            case .four:
-                OnboardingFourView()
+            if hasCompletedOnboarding {
+                ContentView()
+                    .onAppear { hasCompletedOnboarding = true }
+            } else {
+                switch onboardingStep {
+                case .one:
+                    OnboardingOneView {
+                        onboardingStep = .two
+                    }
                     .toolbar(.hidden, for: .navigationBar)
 
-            case .home:
-                ContentView()
-                    .onAppear {
+                case .two:
+                    OnboardingTwoView {
                         hasCompletedOnboarding = true
                     }
+                    .toolbar(.hidden, for: .navigationBar)
+
+                case .four:
+                    OnboardingFourView()
+                        .toolbar(.hidden, for: .navigationBar)
+                }
             }
-        }
-        .onChange(of: hasCompletedOnboarding) { newValue in
-            if newValue { step = .home }
         }
     }
 }
@@ -55,11 +47,15 @@ struct RootView: View {
 @main
 struct ERAApp: App {
     let persistenceController = PersistenceController.shared
+    @StateObject private var pm = PurchaseManager()
+    @StateObject private var access = AccessGate()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                .environmentObject(pm)
+                .environmentObject(access)
         }
     }
 }

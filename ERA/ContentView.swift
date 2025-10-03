@@ -14,8 +14,12 @@ struct ContentView: View {
     @State private var showBreathingView = false
     @State private var showAnalytics = false
     @State private var sessionJustCompleted = false
+    @State private var showNotificationsSettings = false
+    @State private var showPaywall = false
 
     @Environment(\.managedObjectContext) private var viewContext
+    @EnvironmentObject private var pm: PurchaseManager
+    @EnvironmentObject private var access: AccessGate
 
     // Sort with string key to avoid key-path compile issues
     @FetchRequest(
@@ -24,7 +28,7 @@ struct ContentView: View {
     ) private var sessions: FetchedResults<BreathingSession>
 
     // First‑run rings (match OnboardingTwo)
-    private let ringSizes: [CGFloat] = [44, 64, 86, 108]
+    private let ringSizes: [CGFloat] = [12, 20, 32, 44]
     private let ringOpacities: [Double] = [0.70, 0.5, 0.3, 0.15]
     @State private var ringScales: [CGFloat] = [0.01, 0.01, 0.01, 0.01]
     @State private var ringsAnimated = false
@@ -39,11 +43,44 @@ struct ContentView: View {
                 VStack(alignment: .leading) {
                     // Title row
                     HStack {
+                        ZStack {
+                            ForEach(ringSizes.indices, id: \.self) { i in
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(hex: "CBAACB", opacity: ringOpacities[i]),
+                                                Color(hex: "FFB5A7", opacity: ringOpacities[i])
+                                            ],
+                                            startPoint: .center,
+                                            endPoint: .bottom
+                                        )
+                                    )
+                                    .frame(width: ringSizes[i], height: ringSizes[i])
+                                    .scaleEffect(ringScales[i] * groupPulse)
+                                    .zIndex(Double(-i))
+                            }
+                        }
+                        .frame(width: 44, height: 44)
+                        .onAppear {
+                            if !ringsAnimated {
+                                ringsAnimated = true
+                                Task { await animateRings() }
+                            }
+                        }
+
                         Text("Era")
                             .font(.system(size: 32, weight: .bold))
                             .foregroundColor(.black)
                         Spacer()
-                        Button { showAnalytics = true } label: {
+                        Button {
+                            let completed = sessions.filter { ($0.value(forKey: "endedAt") as? Date) != nil }.count
+                            if pm.isPro || access.canStartSession(completedSessions: completed, isPro: pm.isPro) {
+                                showAnalytics = true
+                            } else {
+                                showPaywall = true
+                            }
+                        } label: {
                             Image(systemName: "chart.bar.fill")
                                 .font(.title2)
                                 .contentShape(Rectangle())
@@ -51,6 +88,14 @@ struct ContentView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Show Analytics")
+                        Button { showNotificationsSettings = true } label: {
+                            Image(systemName: "gearshape.fill")
+                                .font(.title2)
+                                .contentShape(Rectangle())
+                                .frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Notification Settings")
                     }
                     .padding(.horizontal)
 
@@ -97,37 +142,10 @@ struct ContentView: View {
                                 .lineSpacing(4)
                                 .padding(.top, 0.5)
                         } else {
-                            // First run: show the animated rings above the label
-                            VStack(spacing: 16) {
-                                ZStack {
-                                    ForEach(ringSizes.indices, id: \.self) { i in
-                                        Circle()
-                                            .fill(
-                                                LinearGradient(
-                                                    colors: [
-                                                        Color(hex: "CBAACB", opacity: ringOpacities[i]),
-                                                        Color(hex: "FFB5A7", opacity: ringOpacities[i])
-                                                    ],
-                                                    startPoint: .center,
-                                                    endPoint: .bottom
-                                                )
-                                            )
-                                            .frame(width: ringSizes[i], height: ringSizes[i])
-                                            .scaleEffect(ringScales[i] * groupPulse)
-                                            .zIndex(Double(-i))
-                                    }
-                                }
-                                .onAppear {
-                                    if !ringsAnimated {
-                                        ringsAnimated = true
-                                        Task { await animateRings() }
-                                    }
-                                }
-
-                                Text("Let's take your first breathing session.")
-                                    .foregroundColor(.gray)
-                                    .font(.system(size: 18))
-                            }
+                            Text("Let's take your first breathing session.")
+                                .foregroundColor(.gray)
+                                .font(.system(size: 18))
+                                .padding(.top, 8)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -158,7 +176,12 @@ struct ContentView: View {
 
                         Button(action: {
                             sessionJustCompleted = false
-                            showBreathingView = true
+                            let completed = sessions.filter { ($0.value(forKey: "endedAt") as? Date) != nil }.count
+                            if access.canStartSession(completedSessions: completed, isPro: pm.isPro) {
+                                showBreathingView = true
+                            } else {
+                                showPaywall = true
+                            }
                         }) {
                             Text("Start Breathing")
                                 .fontWeight(.semibold)
@@ -182,8 +205,6 @@ struct ContentView: View {
                     }
                     .frame(height: 64)
                     .padding(.horizontal, 50)
-//                    .padding(.bottom, 30)
-//                    .padding(.top, 25)
                     .shadow(color: Color(hex: "CBAACB").opacity(0.9), radius: 25, x: 0, y: 10)
                     .onAppear {
                         withAnimation(.linear(duration: 10).repeatForever(autoreverses: false)) {
@@ -201,6 +222,21 @@ struct ContentView: View {
                 }
                 .sheet(isPresented: $showAnalytics) {
                     AnalyticsView(context: viewContext)
+                }
+                .sheet(isPresented: $showNotificationsSettings) {
+                    NotificationSettingsView()
+                }
+                .sheet(isPresented: $showPaywall) {
+                    PaywallView()
+                        .environmentObject(pm)
+                        .environmentObject(access)
+                        .presentationDetents([.fraction(0.6)])
+                        .presentationDragIndicator(.visible)
+                }
+                .onReceive(pm.$isPro) { pro in
+                    if pro {
+                        showPaywall = false
+                    }
                 }
             }
         }

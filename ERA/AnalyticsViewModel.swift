@@ -10,6 +10,8 @@ final class AnalyticsViewModel: ObservableObject {
     @Published var totalMinutes: Int = 0
     @Published var weeklyTrendNormalized: [Double] = []
     @Published var monthlyTrendNormalized: [Double] = []
+    @Published var weeklyTrendRaw: [Int] = []
+    @Published var monthlyTrendRaw: [Int] = []
     @Published var avgIntervalText: String = "—"
     @Published var dominantTimeOfDay: String = "—"
     @Published var dailyGoal: Int = DailyBreathingGoalStore.goal
@@ -49,9 +51,12 @@ final class AnalyticsViewModel: ObservableObject {
             // Weekly & monthly series (oldest → newest), normalized 0...1
             let weekSeries = dailyCounts(lastNDays: 7)
             weeklySessions = weekSeries.reduce(0, +)
+            weeklyTrendRaw = weekSeries
             weeklyTrendNormalized = normalize(weekSeries)
+
             let monthSeries = dailyCounts(lastNDays: 30)
             monthlySessions = monthSeries.reduce(0, +)
+            monthlyTrendRaw = monthSeries
             monthlyTrendNormalized = normalize(monthSeries)
         } catch {
             todaysSessions = 0
@@ -63,6 +68,8 @@ final class AnalyticsViewModel: ObservableObject {
             totalMinutes = 0
             weeklyTrendNormalized = []
             monthlyTrendNormalized = []
+            weeklyTrendRaw = []
+            monthlyTrendRaw = []
         }
     }
 

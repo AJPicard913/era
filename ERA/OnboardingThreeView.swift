@@ -13,6 +13,7 @@ struct OnboardingThreeView: View {
     @State private var typedPrefix: String = ""
     @State private var typedEraCount: Int = 0
     @State private var showQuestionMark: Bool = false
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     
     // Header pieces
     private let headerPrefix: String = "Want me to be notified when to take a moment to breath with "
@@ -130,6 +131,8 @@ struct OnboardingThreeView: View {
                 VStack {
                     Spacer()
                     Button {
+                        hasCompletedOnboarding = true
+                        navigateToFour = false
                         navigateHome = true
                     } label: {
                         Text("Skip")
@@ -181,8 +184,11 @@ struct OnboardingThreeView: View {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { success, _ in
             DispatchQueue.main.async {
                 if success {
+                    navigateHome = false
                     navigateToFour = true
                 } else {
+                    hasCompletedOnboarding = true
+                    navigateToFour = false
                     navigateHome = true
                 }
             }

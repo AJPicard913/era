@@ -88,24 +88,38 @@ struct BreathingView: View {
     // Lifecycle guards
     @State private var started = false
     @State private var sequenceTask: Task<Void, Never>?
+    @State private var showExitButton = false
 
     var body: some View {
         ZStack {
             Color.white.ignoresSafeArea()
 
-            // Circles (now starting further off-screen)
+            // Circles (bottom-docked: always off-screen at the bottom, only grow upward)
             ZStack {
-                circleLayer(sizeFrom: 150, sizeTo: UIScreen.main.bounds.width * 2.5,
-                            yFrom: 200, yTo: -UIScreen.main.bounds.height * 0.3,
-                            back: true)
-                circleLayer(sizeFrom: 120, sizeTo: UIScreen.main.bounds.width * 2.0,
-                            yFrom: 180, yTo: -UIScreen.main.bounds.height * 0.2)
-                circleLayer(sizeFrom: 90,  sizeTo: UIScreen.main.bounds.width * 1.5,
-                            yFrom: 160, yTo: -UIScreen.main.bounds.height * 0.1)
+                circleLayerDocked(
+                    sizeFrom: 150,
+                    sizeTo: UIScreen.main.bounds.width * 3.0,
+                    bottomDock: 200,
+                    back: true
+                )
+                circleLayerDocked(
+                    sizeFrom: 120,
+                    sizeTo: UIScreen.main.bounds.width * 2.5,
+                    bottomDock: 180
+                )
+                circleLayerDocked(
+                    sizeFrom: 90,
+                    sizeTo: UIScreen.main.bounds.width * 2.0,
+                    bottomDock: 160
+                )
             }
-            .scaleEffect(phase == .hold
-                         ? 1.0 + CGFloat(holdAmplitude * sin(holdAnimProgress * .pi * 2.0 * holdCycles))
-                         : 1.0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .scaleEffect(
+                phase == .hold
+                ? 1.0 + CGFloat(holdAmplitude * sin(holdAnimProgress * .pi * 2.0 * holdCycles))
+                : 1.0,
+                anchor: .bottom
+            )
 
             // Button (now positioned further down when active)
             Button(action: { /* no “Done” action */ }) {
@@ -115,7 +129,7 @@ struct BreathingView: View {
                     .padding()
                     .frame(maxWidth: .infinity, minHeight: 60)
                     .contentTransition(.interpolate)
-                    .background(VisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterial)).opacity(0.7))
+                    .background(Color.white)
                     .clipShape(Capsule())
                     .overlay(
                         Capsule().stroke(
@@ -133,6 +147,30 @@ struct BreathingView: View {
             .animation(.interpolatingSpring(stiffness: 110, damping: 12), value: buttonAtTop)
             .animation(.spring(response: 0.35, dampingFraction: 0.55), value: buttonScale)
             .animation(.easeInOut(duration: 0.18), value: buttonTitle)
+
+            if showExitButton {
+                Button(action: { earlyExit() }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.black)
+                        .frame(width: 56, height: 56)
+                        .background(Color.white)
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle().stroke(
+                                LinearGradient(colors: [Color(hex:"CBAACB", opacity:0.7), Color(hex:"FFB5A7", opacity:0.7)],
+                                               startPoint: .leading, endPoint: .trailing),
+                                lineWidth: 1
+                            )
+                        )
+                }
+                .position(
+                    x: UIScreen.main.bounds.width / 2,
+                    y: UIScreen.main.bounds.height - 26 - 28
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(.spring(response: 0.5, dampingFraction: 0.9), value: showExitButton)
+            }
 
             // Finished overlay
             if showFinish {
@@ -171,7 +209,10 @@ struct BreathingView: View {
         await prepareHaptics()
         // Small delay to let layout settle
         try? await Task.sleep(nanoseconds: 200_000_000)
-        await MainActor.run { buttonAtTop = true }
+        await MainActor.run {
+            buttonAtTop = true
+            showExitButton = true
+        }
         await runSequence()
     }
 
@@ -306,20 +347,32 @@ struct BreathingView: View {
         try? await Task.sleep(nanoseconds: 120_000_000)
     }
 
-    // MARK: - Circles (updated to start further off-screen)
+    // MARK: - Circles
     @ViewBuilder
-    private func circleLayer(sizeFrom: CGFloat, sizeTo: CGFloat, yFrom: CGFloat, yTo: CGFloat, back: Bool = false) -> some View {
+    private func circleLayerDocked(
+        sizeFrom: CGFloat,
+        sizeTo: CGFloat,
+        bottomDock: CGFloat,
+        back: Bool = false
+    ) -> some View {
         let opac: Double = back ? 0.3 : (sizeFrom == 120 ? 0.5 : 0.7)
+        let size = interpolate(from: sizeFrom, to: sizeTo, progress: progress)
+
         Circle()
-            .fill(LinearGradient(colors: [Color(hex:"CBAACB", opacity: opac), Color(hex:"FFB5A7", opacity: opac)],
-                                 startPoint: .center, endPoint: .bottom))
-            .frame(
-                width: interpolate(from: sizeFrom, to: sizeTo, progress: progress),
-                height: interpolate(from: sizeFrom, to: sizeTo, progress: progress)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color(hex: "CBAACB", opacity: opac),
+                        Color(hex: "FFB5A7", opacity: opac)
+                    ],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
             )
+            .frame(width: size, height: size)
             .position(
                 x: UIScreen.main.bounds.width / 2,
-                y: UIScreen.main.bounds.height + interpolate(from: yFrom, to: yTo, progress: progress)
+                y: UIScreen.main.bounds.height + bottomDock - (size / 2)
             )
     }
 
@@ -460,6 +513,7 @@ struct BreathingView: View {
 
     private func presentFinishedOverlay() async {
         await MainActor.run {
+            showExitButton = false
             factText = facts.randomElement() ?? facts.first!
             showFinish = true
         }
@@ -469,5 +523,11 @@ struct BreathingView: View {
         await MainActor.run { showFinishCard = true }
         try? await Task.sleep(nanoseconds: 220_000_000)
         await MainActor.run { showFinishClose = true }
+    }
+
+    private func earlyExit() {
+        sequenceTask?.cancel()
+        stopHaptics()
+        dismiss()
     }
 }
